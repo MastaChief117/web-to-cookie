@@ -133,23 +133,32 @@ function readFile(file) {
   });
 }
 
-function wireInput(id) {
+function wireInput(id, buttonId) {
   const input = $(id);
-  if (!input) return;
-  input.addEventListener('change', function () {
+  const button = $(buttonId);
+  if (!input || !button) return;
+
+  button.addEventListener('click', () => {
+    input.value = '';
+    input.click();
+  });
+
+  input.addEventListener('change', () => {
     try {
-      addFiles(this.files);
+      const files = input.files;
+      addFiles(files);
+      // The File objects are copied into picked, so it is safe to reset
+      // the native picker. This also lets Android pick the same file again.
+      input.value = '';
     } catch (error) {
       console.error('CookieHost picker error:', error);
       status('Could not read the selected files: ' + error.message, 'error');
     }
-    // Do NOT clear the value here. Some Android browsers can drop the
-    // FileList while the change event is still being processed.
   });
 }
 
-wireInput('fileInput');
-wireInput('dirInput');
+wireInput('fileInput', 'pickFilesBtn');
+wireInput('dirInput', 'pickFolderBtn');
 
 $('clearBtn').onclick = () => {
   picked = [];
