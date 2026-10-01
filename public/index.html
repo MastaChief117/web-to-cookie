@@ -25,12 +25,10 @@
           <span class="big">📂</span><b>Tap here to pick files</b><span class="hint">or drag &amp; drop on desktop</span>
         </div>
         <div class="row">
-          <label class="file-picker btn btn-ghost">📄 Pick files
-            <input id="fileInput" type="file" multiple />
-          </label>
-          <label class="file-picker btn btn-ghost">📁 Pick folder
-            <input id="dirInput" type="file" multiple webkitdirectory directory />
-          </label>
+          <button class="btn btn-ghost" id="pickFilesBtn" type="button">📄 Pick files</button>
+          <input id="fileInput" type="file" multiple hidden />
+          <button class="btn btn-ghost" id="pickFolderBtn" type="button">📁 Pick folder</button>
+          <input id="dirInput" type="file" multiple webkitdirectory directory hidden />
           <button class="btn btn-ghost" id="clearBtn" type="button">🧹 Clear</button>
         </div>
         <div class="filelist" id="fileList"></div>
@@ -50,7 +48,7 @@
       </div>
     </div>
   </div>
-  <script src="/builder.js?v=3"></script>
+  <script src="/builder.js?v=4"></script>
 
 </body>
 </html>
