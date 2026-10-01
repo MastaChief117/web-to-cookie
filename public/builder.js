@@ -1,6 +1,7 @@
 'use strict';
 
 const CHUNK = 3000;
+const MAX_ENCODED = 64 * 1024;
 const PREFIX = 'cookiehost_';
 const COUNT = PREFIX + 'count';
 const MAX_AGE = 31536000;
@@ -50,7 +51,7 @@ function cleanPath(file) {
 function addFiles(fileList) {
   const files = Array.from(fileList || []);
   if (!files.length) {
-    status('No files were selected. On mobile, use Pick files and choose at least one file.', 'error');
+    status('No files were selected. Pick at least one file.', 'error');
     return;
   }
 
@@ -58,9 +59,8 @@ function addFiles(fileList) {
   for (const file of files) {
     const p = cleanPath(file);
     if (!p) continue;
-    file._cookieHostPath = p;
-    picked = picked.filter(old => old._cookieHostPath !== p);
-    picked.push(file);
+    picked = picked.filter(old => old.path !== p);
+    picked.push({ file, path: p });
     added++;
   }
 
@@ -72,17 +72,18 @@ function render() {
   const list = $('fileList');
   list.replaceChildren();
 
-  for (const file of [...picked].sort((a,b) =>
-    a._cookieHostPath.localeCompare(b._cookieHostPath))) {
+  for (const item of [...picked].sort((a,b) =>
+    a.path.localeCompare(b.path))) {
+    const file = item.file;
     const row = document.createElement('div');
-    row.className = 'file ' + (ALLOWED.has(ext(file._cookieHostPath)) ? '' : 'bad');
+    row.className = 'file ' + (ALLOWED.has(ext(item.path)) ? '' : 'bad');
 
     const name = document.createElement('code');
-    name.textContent = file._cookieHostPath;
+    name.textContent = item.path;
 
     const size = document.createElement('small');
     size.textContent = bytesText(file.size) +
-      (ALLOWED.has(ext(file._cookieHostPath)) ? '' : ' · UNSUPPORTED');
+      (ALLOWED.has(ext(item.path)) ? '' : ' · UNSUPPORTED');
 
     row.append(name, size);
     list.appendChild(row);
@@ -101,7 +102,7 @@ function cookies() {
 function wipeCookies() {
   for (const key of cookies().keys()) {
     if (key === COUNT || key.startsWith(PREFIX)) {
-      document.cookie = key + '=; Path=/; Max-Age=0; SameSite=Lax';
+      document.cookie = key + '=; Path=/; Max-Age=0; SameSite=Strict';
     }
   }
 }
@@ -133,23 +134,13 @@ function readFile(file) {
   });
 }
 
-function wireInput(id, buttonId) {
+function wireInput(id) {
   const input = $(id);
-  const button = $(buttonId);
-  if (!input || !button) return;
-
-  button.addEventListener('click', () => {
-    input.value = '';
-    input.click();
-  });
-
+  if (!input) return;
   input.addEventListener('change', () => {
     try {
-      const files = input.files;
-      addFiles(files);
-      // The File objects are copied into picked, so it is safe to reset
-      // the native picker. This also lets Android pick the same file again.
-      input.value = '';
+      addFiles(input.files);
+      // Keep the native input usable on Android; do not clear it here.
     } catch (error) {
       console.error('CookieHost picker error:', error);
       status('Could not read the selected files: ' + error.message, 'error');
@@ -157,8 +148,8 @@ function wireInput(id, buttonId) {
   });
 }
 
-wireInput('fileInput', 'pickFilesBtn');
-wireInput('dirInput', 'pickFolderBtn');
+wireInput('fileInput');
+wireInput('dirInput');
 
 $('clearBtn').onclick = () => {
   picked = [];
@@ -195,15 +186,15 @@ $('drop').ondrop = e => {
 $('bakeBtn').onclick = async () => {
   if (!picked.length) return status('No files picked. Pick files first.', 'error');
 
-  const bad = picked.filter(f => !ALLOWED.has(ext(f._cookieHostPath)));
+  const bad = picked.filter(item => !ALLOWED.has(ext(item.path)));
   if (bad.length) {
     return status('Unsupported files:\n- ' +
-      bad.map(f => f._cookieHostPath).join('\n- ') +
+      bad.map(item => item.path).join('\n- ') +
       '\n\nV1 is text-only.', 'error');
   }
 
-  if (!picked.some(f => /^index\.html?$/i.test(f._cookieHostPath) ||
-                         /\.html?$/i.test(f._cookieHostPath))) {
+  if (!picked.some(item => /^index\.html?$/i.test(item.path) ||
+                         /\.html?$/i.test(item.path))) {
     return status('No HTML file found. Add index.html.', 'error');
   }
 
@@ -217,20 +208,23 @@ $('bakeBtn').onclick = async () => {
     const files = [];
     for (const file of picked) {
       files.push({
-        path: file._cookieHostPath,
+        path: item.path,
         content: await readFile(file)
       });
     }
 
     status('Compressing website…');
-    const raw = new TextEncoder().encode(JSON.stringify({
-      version: 1,
-      compressed: 'gzip',
-      files
-    }));
-
-    const compressed = await compress(raw);
+    let raw = new TextEncoder().encode(JSON.stringify({ version: 1, compressed: 'none', files }));
+    let compressed = await compress(raw);
+    if (compressed.algorithm === 'gzip') {
+      raw = new TextEncoder().encode(JSON.stringify({ version: 1, compressed: 'gzip', files }));
+      compressed = await compress(raw);
+    }
     const encoded = base64url(compressed.bytes);
+    if (encoded.length > MAX_ENCODED) {
+      throw new Error('This site is too large for cookie mode. Keep the encoded payload under 64 KiB.');
+    }
+
     const chunks = [];
 
     for (let i = 0; i < encoded.length; i += CHUNK) {
@@ -243,10 +237,10 @@ $('bakeBtn').onclick = async () => {
     for (let i = 0; i < chunks.length; i++) {
       const name = PREFIX + String(i).padStart(4, '0');
       document.cookie = name + '=' + chunks[i] +
-        '; Path=/; SameSite=Lax; Max-Age=' + MAX_AGE;
+        '; Path=/; SameSite=Strict; Max-Age=' + MAX_AGE;
     }
     document.cookie = COUNT + '=' + chunks.length +
-      '; Path=/; SameSite=Lax; Max-Age=' + MAX_AGE;
+      '; Path=/; SameSite=Strict; Max-Age=' + MAX_AGE;
 
     const jar = cookies();
     let stored = 0;
