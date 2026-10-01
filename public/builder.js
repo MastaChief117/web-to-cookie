@@ -135,9 +135,16 @@ function readFile(file) {
 
 function wireInput(id) {
   const input = $(id);
-  input.addEventListener('change', () => {
-    addFiles(input.files);
-    input.value = '';
+  if (!input) return;
+  input.addEventListener('change', function () {
+    try {
+      addFiles(this.files);
+    } catch (error) {
+      console.error('CookieHost picker error:', error);
+      status('Could not read the selected files: ' + error.message, 'error');
+    }
+    // Do NOT clear the value here. Some Android browsers can drop the
+    // FileList while the change event is still being processed.
   });
 }
 
