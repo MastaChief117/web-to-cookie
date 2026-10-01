@@ -1,5 +1,6 @@
 'use strict';
 const PREFIX='cookiehost_', COUNT='cookiehost_count';
+const MAX_CHUNKS=22;
 const $=id=>document.getElementById(id);
 function cookies(){const m=new Map();for(const p of (document.cookie||'').split(';')){const i=p.indexOf('=');if(i>=0)m.set(p.slice(0,i).trim(),p.slice(i+1).trim())}return m}
 function fail(s){$('loaderStatus').textContent='Failed. See error below.';$('spinner').textContent='🧂';$('spinner').classList.add('done');$('err').textContent=s;$('err').className='status error'}
@@ -14,8 +15,8 @@ function inline(html,base,map){const d=new DOMParser().parseFromString(html,'tex
 for(const l of [...d.querySelectorAll('link[rel="stylesheet"][href]')]){const r=resolve(base,l.getAttribute('href'));const f=r&&(map.get(r)||map.get(r.toLowerCase()));if(f){const s=d.createElement('style');s.textContent=f.content;l.replaceWith(s);css++}}
 for(const s of [...d.querySelectorAll('script[src]')]){const r=resolve(base,s.getAttribute('src'));const f=r&&(map.get(r)||map.get(r.toLowerCase()));if(f){const n=d.createElement('script');for(const a of s.attributes)if(a.name!=='src')n.setAttribute(a.name,a.value);n.textContent=f.content.replace(/<\/script/gi,'<\\/script');s.replaceWith(n);js++}}
 return{html:'<!DOCTYPE html>\n'+d.documentElement.outerHTML,css,js}}
-async function load(){ $('err').textContent='';$('err').className='status';$('frameWrap').classList.remove('show');const j=cookies(),n=Number(j.get(COUNT)||0);
-if(!n){fail('No CookieHost website was found in this browser.\n\nGo to /builder and bake a website first.');return}
+async function load(){ $('err').textContent='';$('err').className='status';$('frameWrap').classList.remove('show');const j=cookies(),rawCount=j.get(COUNT),n=Number(rawCount);
+if(!Number.isSafeInteger(n)||n<1||n>MAX_CHUNKS){fail('Invalid or oversized CookieHost package.\n\nExpected 1–'+MAX_CHUNKS+' cookie chunks.');return}{fail('No CookieHost website was found in this browser.\n\nGo to /builder and bake a website first.');return}
 let s='';for(let i=0;i<n;i++){const v=j.get(PREFIX+String(i).padStart(4,'0'));if(v==null){fail('CookieHost data is incomplete.\nMissing chunk: '+PREFIX+String(i).padStart(4,'0'));return}s+=v}
 try{ $('loaderStatus').textContent=`Found ${n} cookie chunk(s). Decoding…`;let bytes=b64(s),pkg;
 try{pkg=JSON.parse(new TextDecoder().decode(await gunzip(bytes)))}catch{pkg=JSON.parse(new TextDecoder().decode(bytes))}
@@ -26,5 +27,5 @@ $('loaderStatus').textContent='Website reconstructed from cookies!';$('spinner')
 $('meta').innerHTML='';for(const x of [`${pkg.files.length} files`,`${n} cookies`,`CSS inlined: ${r.css}`,`JS inlined: ${r.js}`]){const c=document.createElement('span');c.className='chip';c.textContent=x;$('meta').appendChild(c)}
 $('frameLabel').textContent='🌐 '+e.path;$('siteFrame').srcdoc=r.html;$('frameWrap').classList.add('show')
 }catch(e){fail(e.message||String(e))}}
-$('clearBtn').onclick=()=>{for(const k of cookies().keys())if(k===COUNT||k.startsWith(PREFIX))document.cookie=k+'=; Path=/; Max-Age=0; SameSite=Lax';location.reload()};
+$('clearBtn').onclick=()=>{for(const k of cookies().keys())if(k===COUNT||k.startsWith(PREFIX))document.cookie=k+'=; Path=/; Max-Age=0; SameSite=Strict';location.reload()};
 $('retryBtn').onclick=load;load();
