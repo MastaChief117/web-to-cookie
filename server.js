@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
+if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65535) throw new Error('Invalid PORT');
 const PUBLIC = path.join(__dirname, 'public');
 
 const TYPES = {
@@ -18,11 +19,14 @@ const TYPES = {
 };
 
 function safeJoin(base, reqPath) {
-  const decoded = decodeURIComponent(reqPath.split('?')[0]);
+  let decoded;
+  try { decoded = decodeURIComponent(reqPath.split('?')[0]); }
+  catch { return null; }
   const normalized = path.posix.normalize(decoded);
   const rel = normalized.replace(/^\/+/, '');
-  const full = path.join(base, rel);
-  if (!full.startsWith(base)) return null;
+  const full = path.resolve(base, rel);
+  const relative = path.relative(path.resolve(base), full);
+  if (relative.startsWith('..' + path.sep) || path.isAbsolute(relative)) return null;
   return full;
 }
 
@@ -66,6 +70,8 @@ const server = http.createServer((req, res) => {
       'Content-Type': type,
       'Content-Length': data.length,
       'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'no-referrer',
     });
     if (req.method === 'HEAD') return res.end();
     res.end(data);
