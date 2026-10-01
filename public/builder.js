@@ -188,13 +188,13 @@ $('bakeBtn').onclick = async () => {
 
   const bad = picked.filter(f => !ALLOWED.has(ext(f._cookieHostPath)));
   if (bad.length) {
-    return status('Unsupported files:\\n- ' +
-      bad.map(f => f._cookieHostPath).join('\\n- ') +
-      '\\n\\nV1 is text-only.', 'error');
+    return status('Unsupported files:\n- ' +
+      bad.map(f => f._cookieHostPath).join('\n- ') +
+      '\n\nV1 is text-only.', 'error');
   }
 
-  if (!picked.some(f => /^index\\.html?$/i.test(f._cookieHostPath) ||
-                         /\\.html?$/i.test(f._cookieHostPath))) {
+  if (!picked.some(f => /^index\.html?$/i.test(f._cookieHostPath) ||
+                         /\.html?$/i.test(f._cookieHostPath))) {
     return status('No HTML file found. Add index.html.', 'error');
   }
 
@@ -265,9 +265,9 @@ $('bakeBtn').onclick = async () => {
 
     $('baked').classList.add('show');
     status(
-      '🍪 WEBSITE BAKED\\n' +
+      '🍪 WEBSITE BAKED\n' +
       files.length + ' files · ' + chunks.length + ' cookies · ' +
-      bytesText(encoded.length) + ' payload\\nOpen /loadsite.',
+      bytesText(encoded.length) + ' payload\nOpen /loadsite.',
       'ok'
     );
   } catch (error) {
