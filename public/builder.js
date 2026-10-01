@@ -1,23 +1,273 @@
 'use strict';
-const CHUNK=3000,P='cookiehost_',COUNT=P+'count',MAX=31536000,ALLOWED=new Set(['html','htm','css','js','json','txt','svg']);
-const $=id=>document.getElementById(id);let picked=[];
-function ext(n){return n.includes('.')?n.split('.').pop().toLowerCase():''}
-function stat(s,k=''){$('status').textContent=s;$('status').className='status '+k}
-function kb(n){return n<1024?Math.round(n)+' B':(n/1024).toFixed(1)+' KB'}
-function setStats(a={}){for(const [id,v] of Object.entries({sFiles:a.files,sOrig:a.orig!=null?kb(a.orig):null,sComp:a.comp!=null?kb(a.comp):null,sEnc:a.enc!=null?kb(a.enc):null,sCookies:a.cookies,sStored:a.stored}))$(id).textContent=v??'—'}
-function pathOf(f,dir){let p=(f.webkitRelativePath||f.name).replace(/\\/g,'/').replace(/^\/+|^\.\//,'');let a=p.split('/').filter(x=>x&&x!=='.');if(a.some(x=>x==='..'))return null;if(dir&&a.length>1)a.shift();return a.join('/')}
-function add(fs,dir=false){for(const f of fs){const p=pathOf(f,dir);if(!p)continue;f._chPath=p;picked=picked.filter(x=>x._chPath!==p);picked.push(f)}render();stat(`Added ${fs.length} file(s). Total: ${picked.length}.`)}
-function render(){$('fileList').textContent='';for(const f of [...picked].sort((a,b)=>a._chPath.localeCompare(b._chPath))){const d=document.createElement('div');d.className='file '+(ALLOWED.has(ext(f._chPath))?'':'bad');const c=document.createElement('code');c.textContent=f._chPath;const s=document.createElement('small');s.textContent=kb(f.size)+(ALLOWED.has(ext(f._chPath))?'':' · UNSUPPORTED');d.append(c,s);$('fileList').appendChild(d)}}
-function jar(){const m=new Map;for(const p of(document.cookie||'').split(';')){const i=p.indexOf('=');if(i>=0)m.set(p.slice(0,i).trim(),p.slice(i+1).trim())}return m}
-function wipe(){for(const k of jar().keys())if(k===COUNT||k.startsWith(P))document.cookie=k+'=; Path=/; Max-Age=0; SameSite=Lax'}
-function b64(bytes){let s='';for(let i=0;i<bytes.length;i+=32768)s+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(s).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')}
-async function gzip(bytes){if(!window.CompressionStream)return{bytes,algo:'none'};const s=new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));return{bytes:new Uint8Array(await new Response(s).arrayBuffer()),algo:'gzip'}}
-$('fileInput').onchange=()=>{add([...$('fileInput').files]);$('fileInput').value=''};
-$('dirInput').onchange=()=>{add([...$('dirInput').files],true);$('dirInput').value=''};
-$('clearBtn').onclick=()=>{picked=[];render();setStats();stat('Cleared.')};
-$('wipeBtn').onclick=()=>{wipe();$('baked').classList.remove('show');setStats();stat('Cookies eaten. 🍪','ok')};
-$('drop').onclick=()=>$('fileInput').click();
-$('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('over')};
-$('drop').ondragleave=()=>$('drop').classList.remove('over');
-$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('over');add([...e.dataTransfer.files])};
-$('bakeBtn').onclick=async()=>{if(!picked.length)return stat('No files picked.','error');const bad=picked.filter(f=>!ALLOWED.has(ext(f._chPath)));if(bad.length)return stat('Unsupported files:\n- '+bad.map(f=>f._chPath).join('\n- ')+'\n\nV1 is text-only.','error');if(!picked.some(f=>/\.html?$/i.test(f._chPath)))return stat('No HTML file found. Add index.html.','error');$('bakeBtn').disabled=true;$('progress').classList.add('show');try{const files=[];for(const f of picked)files.push({path:f._chPath,content:await f.text()});const raw=new TextEncoder().encode(JSON.stringify({version:1,compressed:'gzip',files}));const z=await gzip(raw);const payload=z.bytes,enc=b64(payload),chunks=[];for(let i=0;i<enc.length;i+=CHUNK)chunks.push(enc.slice(i,i+CHUNK));wipe();chunks.forEach((c,i)=>document.cookie=`${P}${String(i).padStart(4,'0')}=${c}; Path=/; SameSite=Lax; Max-Age=${MAX}`);document.cookie=`${COUNT}=${chunks.length}; Path=/; SameSite=Lax; Max-Age=${MAX}`;const j=jar();let found=0;for(let i=0;i<chunks.length;i++)if(j.has(P+String(i).padStart(4,'0')))found++;setStats({files:files.length,orig:raw.length,comp:payload.length,enc:enc.length,cookies:chunks.length,stored:found+'/'+chunks.length});if(found!==chunks.length){wipe();return stat(`Cookie storage limit exceeded. Stored ${found}/${chunks.length} chunks. Try a smaller site.`,'error')}stat(`🍪 WEBSITE BAKED\n${files.length} files · ${chunks.length} cookies · ${kb(enc.length)} payload\nOpen /loadsite.`,'ok');$('baked').classList.add('show')}catch(e){stat('Baking failed: '+e.message,'error')}finally{$('bakeBtn').disabled=false;$('progress').classList.remove('show')}};
+
+const CHUNK = 3000;
+const PREFIX = 'cookiehost_';
+const COUNT = PREFIX + 'count';
+const MAX_AGE = 31536000;
+const ALLOWED = new Set(['html','htm','css','js','json','txt','svg']);
+
+const $ = id => document.getElementById(id);
+let picked = [];
+
+function ext(name) {
+  const i = name.lastIndexOf('.');
+  return i === -1 ? '' : name.slice(i + 1).toLowerCase();
+}
+
+function status(message, kind = '') {
+  const el = $('status');
+  el.textContent = message;
+  el.className = 'status ' + kind;
+}
+
+function bytesText(n) {
+  if (n == null) return '—';
+  if (n < 1024) return Math.round(n) + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+  return (n / 1024 / 1024).toFixed(2) + ' MB';
+}
+
+function setStats(a = {}) {
+  const vals = {
+    sFiles: a.files,
+    sOrig: a.orig == null ? null : bytesText(a.orig),
+    sComp: a.comp == null ? null : bytesText(a.comp),
+    sEnc: a.enc == null ? null : bytesText(a.enc),
+    sCookies: a.cookies,
+    sStored: a.stored
+  };
+  for (const [id, value] of Object.entries(vals)) $(id).textContent = value ?? '—';
+}
+
+function cleanPath(file) {
+  let p = (file.webkitRelativePath || file.name || '').replace(/\\/g, '/');
+  p = p.replace(/^\/+/, '').replace(/^\.\//, '');
+  const parts = p.split('/').filter(Boolean);
+  if (!parts.length || parts.includes('..')) return null;
+  return parts.join('/');
+}
+
+function addFiles(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) {
+    status('No files were selected. On mobile, use Pick files and choose at least one file.', 'error');
+    return;
+  }
+
+  let added = 0;
+  for (const file of files) {
+    const p = cleanPath(file);
+    if (!p) continue;
+    file._cookieHostPath = p;
+    picked = picked.filter(old => old._cookieHostPath !== p);
+    picked.push(file);
+    added++;
+  }
+
+  render();
+  status('Added ' + added + ' file(s). Total: ' + picked.length + '.', 'ok');
+}
+
+function render() {
+  const list = $('fileList');
+  list.replaceChildren();
+
+  for (const file of [...picked].sort((a,b) =>
+    a._cookieHostPath.localeCompare(b._cookieHostPath))) {
+    const row = document.createElement('div');
+    row.className = 'file ' + (ALLOWED.has(ext(file._cookieHostPath)) ? '' : 'bad');
+
+    const name = document.createElement('code');
+    name.textContent = file._cookieHostPath;
+
+    const size = document.createElement('small');
+    size.textContent = bytesText(file.size) +
+      (ALLOWED.has(ext(file._cookieHostPath)) ? '' : ' · UNSUPPORTED');
+
+    row.append(name, size);
+    list.appendChild(row);
+  }
+}
+
+function cookies() {
+  const map = new Map();
+  for (const item of (document.cookie || '').split(';')) {
+    const i = item.indexOf('=');
+    if (i >= 0) map.set(item.slice(0, i).trim(), item.slice(i + 1).trim());
+  }
+  return map;
+}
+
+function wipeCookies() {
+  for (const key of cookies().keys()) {
+    if (key === COUNT || key.startsWith(PREFIX)) {
+      document.cookie = key + '=; Path=/; Max-Age=0; SameSite=Lax';
+    }
+  }
+}
+
+function base64url(bytes) {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 32768) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 32768));
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+
+async function compress(bytes) {
+  if (!window.CompressionStream) return { bytes, algorithm: 'none' };
+  const stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));
+  return {
+    bytes: new Uint8Array(await new Response(stream).arrayBuffer()),
+    algorithm: 'gzip'
+  };
+}
+
+function readFile(file) {
+  if (typeof file.text === 'function') return file.text();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('Could not read ' + file.name));
+    reader.readAsText(file);
+  });
+}
+
+function wireInput(id) {
+  const input = $(id);
+  input.addEventListener('change', () => {
+    addFiles(input.files);
+    input.value = '';
+  });
+}
+
+wireInput('fileInput');
+wireInput('dirInput');
+
+$('clearBtn').onclick = () => {
+  picked = [];
+  render();
+  setStats();
+  status('Cleared.');
+};
+
+$('wipeBtn').onclick = () => {
+  wipeCookies();
+  $('baked').classList.remove('show');
+  setStats();
+  status('Cookies eaten. 🍪', 'ok');
+};
+
+$('drop').onclick = e => {
+  if (e.target.closest('input')) return;
+  $('fileInput').click();
+};
+
+$('drop').ondragover = e => {
+  e.preventDefault();
+  $('drop').classList.add('over');
+};
+
+$('drop').ondragleave = () => $('drop').classList.remove('over');
+
+$('drop').ondrop = e => {
+  e.preventDefault();
+  $('drop').classList.remove('over');
+  addFiles(e.dataTransfer && e.dataTransfer.files);
+};
+
+$('bakeBtn').onclick = async () => {
+  if (!picked.length) return status('No files picked. Pick files first.', 'error');
+
+  const bad = picked.filter(f => !ALLOWED.has(ext(f._cookieHostPath)));
+  if (bad.length) {
+    return status('Unsupported files:\\n- ' +
+      bad.map(f => f._cookieHostPath).join('\\n- ') +
+      '\\n\\nV1 is text-only.', 'error');
+  }
+
+  if (!picked.some(f => /^index\\.html?$/i.test(f._cookieHostPath) ||
+                         /\\.html?$/i.test(f._cookieHostPath))) {
+    return status('No HTML file found. Add index.html.', 'error');
+  }
+
+  const button = $('bakeBtn');
+  button.disabled = true;
+  $('progress').classList.add('show');
+
+  try {
+    status('Reading selected files…');
+
+    const files = [];
+    for (const file of picked) {
+      files.push({
+        path: file._cookieHostPath,
+        content: await readFile(file)
+      });
+    }
+
+    status('Compressing website…');
+    const raw = new TextEncoder().encode(JSON.stringify({
+      version: 1,
+      compressed: 'gzip',
+      files
+    }));
+
+    const compressed = await compress(raw);
+    const encoded = base64url(compressed.bytes);
+    const chunks = [];
+
+    for (let i = 0; i < encoded.length; i += CHUNK) {
+      chunks.push(encoded.slice(i, i + CHUNK));
+    }
+
+    status('Writing ' + chunks.length + ' cookies…');
+    wipeCookies();
+
+    for (let i = 0; i < chunks.length; i++) {
+      const name = PREFIX + String(i).padStart(4, '0');
+      document.cookie = name + '=' + chunks[i] +
+        '; Path=/; SameSite=Lax; Max-Age=' + MAX_AGE;
+    }
+    document.cookie = COUNT + '=' + chunks.length +
+      '; Path=/; SameSite=Lax; Max-Age=' + MAX_AGE;
+
+    const jar = cookies();
+    let stored = 0;
+    for (let i = 0; i < chunks.length; i++) {
+      if (jar.has(PREFIX + String(i).padStart(4, '0'))) stored++;
+    }
+
+    setStats({
+      files: files.length,
+      orig: raw.length,
+      comp: compressed.bytes.length,
+      enc: encoded.length,
+      cookies: chunks.length,
+      stored: stored + '/' + chunks.length
+    });
+
+    if (stored !== chunks.length) {
+      wipeCookies();
+      return status(
+        'Cookie storage limit reached: only ' + stored + '/' + chunks.length +
+        ' chunks were stored. Try a smaller site.',
+        'error'
+      );
+    }
+
+    $('baked').classList.add('show');
+    status(
+      '🍪 WEBSITE BAKED\\n' +
+      files.length + ' files · ' + chunks.length + ' cookies · ' +
+      bytesText(encoded.length) + ' payload\\nOpen /loadsite.',
+      'ok'
+    );
+  } catch (error) {
+    console.error('CookieHost bake error:', error);
+    status('Baking failed: ' + (error && error.message ? error.message : error), 'error');
+  } finally {
+    button.disabled = false;
+    $('progress').classList.remove('show');
+  }
+};
