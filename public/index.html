@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>🍪 CookieHost — host a website in cookies</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="bg-cookies" aria-hidden="true">
+    <span>🍪</span><span>🍪</span><span>🍪</span><span>🍪</span><span>✨</span><span>🥛</span>
+  </div>
+
+  <div class="wrap">
+    <div class="brand">
+      <div class="logo">🍪</div>
+      <div>
+        <h1>Cookie<em>Host</em></h1>
+        <p class="tag">Why host a website normally <strong>when you can put it in cookies?</strong></p>
+      </div>
+    </div>
+
+    <div class="hero">
+      <h2>🥛 The oven is preheated.</h2>
+      <p>
+        Upload a tiny <b>text-only</b> website. Your browser packages it as JSON,
+        gzip-compresses it, Base64URL-encodes it, splits it into
+        <b>~3KB cookie chunks</b> (<code>cookiehost_0000…</code>), and stores it
+        right here in this browser. Nothing is uploaded to the server — the server is just a static shelf.
+      </p>
+      <div class="pills">
+        <span class="pill">📄 html · css · js · json · txt · svg</span>
+        <span class="pill">🚫 no png / jpg / fonts / mp3 / pdf yet</span>
+        <span class="pill">📦 ~300–500KB max · cookies go on every request lol</span>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>1 · Add your ingredients</h3>
+        <p class="sub">Select files or a whole folder. Paths are preserved. Try the <code>test-site/</code> folder first.</p>
+
+        <div class="drop" id="drop">
+          <span class="big">📂</span>
+          <b>Drag &amp; drop files / folder here</b>
+          <span class="hint">or use the buttons below — index.html is your entry point</span>
+        </div>
+
+        <div class="row">
+          <label class="btn btn-ghost" style="cursor:pointer">
+            📄 Pick files
+            <input id="fileInput" type="file" multiple hidden />
+          </label>
+          <label class="btn btn-ghost" style="cursor:pointer">
+            📁 Pick folder
+            <input id="dirInput" type="file" webkitdirectory hidden />
+          </label>
+          <button class="btn btn-ghost" id="clearBtn" type="button">🧹 Clear</button>
+        </div>
+
+        <div class="filelist" id="fileList"></div>
+
+        <div class="row">
+          <button class="btn btn-bake" id="bakeBtn" type="button">🔥 Bake Website 🍪</button>
+        </div>
+        <div class="progress" id="progress"><i></i></div>
+        <div class="status" id="status"></div>
+
+        <div class="warn">
+          ⚠️ Your site's JavaScript <b>will execute</b> when opened at
+          <code>/loadsite</code>. Only bake sites you trust. Uploaded files never leave your browser.
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>2 · Fresh out of the oven</h3>
+        <p class="sub">Stats + a portal to your cookie dimension.</p>
+        <div class="stats">
+          <div class="stat"><b>Files</b><span id="sFiles">—</span></div>
+          <div class="stat"><b>Original</b><span id="sOrig">—</span></div>
+          <div class="stat"><b>Compressed</b><span id="sComp">—</span></div>
+          <div class="stat"><b>Payload</b><span id="sEnc">—</span></div>
+          <div class="stat"><b>Cookies</b><span id="sCookies">—</span></div>
+          <div class="stat"><b>Stored ✓</b><span id="sStored">—</span></div>
+        </div>
+
+        <div style="height:14px"></div>
+
+        <div class="baked" id="baked">
+          <div class="cookies">🍪</div>
+          <h4>YOUR WEBSITE IS NOW COOKIES.</h4>
+          <p>Stored in this browser only.<br />Open <code>/loadsite</code> to taste it.</p>
+          <div class="row" style="justify-content:center">
+            <a href="loadsite/"><button class="btn btn-dark" type="button">🚀 Open Website</button></a>
+            <button class="btn btn-ghost" id="wipeBtn" type="button">🗑️ Eat cookies</button>
+          </div>
+        </div>
+
+        <div class="warn">
+          🍪 Cookies used: <code>cookiehost_count</code> + <code>cookiehost_0000…N</code><br />
+          <code>Path=/ · SameSite=Lax · 1 year</code>. Old cookies are wiped before each bake.
+          Every request to this server now carries your website. Deliciously inefficient.
+        </div>
+      </div>
+    </div>
+
+    <div class="diagram">
+      <code><span class="crumb">builder → package → gzip → base64url → split(3000) → 🍪🍪🍪 → /loadsite → join → gunzip → inline css/js → iframe</span>
+/builder ──► browser oven ──► document.cookie ◄── /loadsite reads it back
+server stores: nothing. zero. crumbs.</code>
+    </div>
+
+    <footer>Made for fun · V1 text-only · V2 maybe images via data-URLs · <a href="/loadsite" style="color:inherit">/loadsite</a></footer>
+  </div>
+
+  <script src="/builder.js"></script>
+</body>
+</html>
