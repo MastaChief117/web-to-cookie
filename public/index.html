@@ -15,7 +15,7 @@
     <div class="hero">
       <h2>🥛 The oven is preheated.</h2>
       <p>Upload a tiny <b>text-only</b> website. Your browser packages it as JSON, gzip-compresses it, Base64URL-encodes it, splits it into <b>~3KB cookie chunks</b>, and stores it right here in this browser. Nothing is uploaded to the server.</p>
-      <div class="pills"><span class="pill">📄 html · css · js · json · txt · svg</span><span class="pill">🚫 no png / jpg / fonts / mp3 / pdf yet</span><span class="pill">📦 ~300–500KB max</span></div>
+      <div class="pills"><span class="pill">📄 html · css · js · json · txt · svg</span><span class="pill">🚫 no png / jpg / fonts / mp3 / pdf yet</span><span class="pill">🍪 cookie mode: small sites only</span></div>
     </div>
     <div class="grid">
       <div class="card">
@@ -25,10 +25,8 @@
           <span class="big">📂</span><b>Tap here to pick files</b><span class="hint">or drag &amp; drop on desktop</span>
         </div>
         <div class="row">
-          <button class="btn btn-ghost" id="pickFilesBtn" type="button">📄 Pick files</button>
-          <input id="fileInput" type="file" multiple hidden />
-          <button class="btn btn-ghost" id="pickFolderBtn" type="button">📁 Pick folder</button>
-          <input id="dirInput" type="file" multiple webkitdirectory directory hidden />
+          <label class="file-picker btn btn-ghost">📄 Pick files<input id="fileInput" type="file" multiple /></label>
+          <label class="file-picker btn btn-ghost">📁 Pick folder<input id="dirInput" type="file" multiple webkitdirectory directory /></label>
           <button class="btn btn-ghost" id="clearBtn" type="button">🧹 Clear</button>
         </div>
         <div class="filelist" id="fileList"></div>
@@ -43,8 +41,8 @@
           <div class="stat"><b>Files</b><span id="sFiles">—</span></div><div class="stat"><b>Original</b><span id="sOrig">—</span></div><div class="stat"><b>Compressed</b><span id="sComp">—</span></div><div class="stat"><b>Payload</b><span id="sEnc">—</span></div><div class="stat"><b>Cookies</b><span id="sCookies">—</span></div><div class="stat"><b>Stored ✓</b><span id="sStored">—</span></div>
         </div>
         <div style="height:14px"></div>
-        <div class="baked" id="baked"><div class="cookies">🍪</div><h4>YOUR WEBSITE IS NOW COOKIES.</h4><p>Stored in this browser only.<br />Open <code>/loadsite</code> to taste it.</p><div class="row" style="justify-content:center"><a href="loadsite/"><button class="btn btn-dark" type="button">🚀 Open Website</button></a><button class="btn btn-ghost" id="wipeBtn" type="button">🗑️ Eat cookies</button></div></div>
-        <div class="warn">🍪 Cookies used: <code>cookiehost_count</code> + <code>cookiehost_0000…N</code><br /><code>Path=/ · SameSite=Lax · 1 year</code></div>
+        <div class="baked" id="baked"><div class="cookies">🍪</div><h4>YOUR WEBSITE IS NOW COOKIES.</h4><p>Stored in this browser only.<br />Open <code>/loadsite</code> to taste it.</p><div class="row" style="justify-content:center"><a class="btn btn-dark" href="/loadsite/">🚀 Open Website</a><button class="btn btn-ghost" id="wipeBtn" type="button">🗑️ Eat cookies</button></div></div>
+        <div class="warn">🍪 Cookies used: <code>cookiehost_count</code> + <code>cookiehost_0000…N</code><br /><code>Path=/ · SameSite=Strict · 1 year</code></div>
       </div>
     </div>
   </div>
