@@ -1,0 +1,15 @@
+{
+  "name": "cookiehost",
+  "version": "1.0.0",
+  "description": "CookieHost V1 — I hosted a website in cookies.",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "playwright-core": "^1.63.0"
+  }
+}
