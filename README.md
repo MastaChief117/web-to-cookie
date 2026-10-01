@@ -2,7 +2,9 @@
 
 > Why host a website normally when you can put it in cookies?
 
-Experimental app: upload a tiny text-only site → browser gzips → base64url → splits into `cookiehost_0000…` chunks → `/loadsite` rebuilds it in an isolated iframe. Server stores nothing.
+Experimental static app: pick a tiny text-only site → the browser packages it → gzip-compresses it when available → Base64URL-encodes it → stores the result in cookie chunks → `/loadsite` reconstructs it in a sandboxed iframe.
+
+**Important:** cookies are sent automatically with matching HTTP requests. CookieHost therefore does **not** provide a zero-network/privacy guarantee. The cookie mode is deliberately small and capped at 64 KiB of encoded payload.
 
 ## Run
 
@@ -12,17 +14,25 @@ npm start
 # loader  → http://localhost:3000/loadsite
 ```
 
-No dependencies. Node ≥ 18 (uses only `http`/`fs`/`path`; browser uses `CompressionStream`).
+No runtime npm dependencies. Node ≥ 18.
 
-## Limits (V1)
+## Limits
 
 - Text only: `.html .htm .css .js .json .txt .svg`
-- Chunk: 3000 chars/cookie, `Path=/; SameSite=Lax; 1yr`
-- Expect ~300–500KB usable. Every request carries your site. Deliciously inefficient.
-- JS in baked sites *will execute* in the iframe (`allow-scripts`, no `allow-same-origin`).
+- 3000-character cookie chunks
+- Maximum encoded cookie payload: 64 KiB
+- Cookies use `Path=/; SameSite=Strict; Max-Age=1 year`
+- JavaScript in baked sites executes inside a sandboxed iframe with scripts enabled and same-origin disabled.
+- Cookie mode is intentionally a cursed demo, not normal hosting.
+
+## Privacy
+
+If you need the website data to stay client-side without being automatically attached to HTTP requests, **do not use cookies**. Use IndexedDB or localStorage instead. Browsers automatically include matching cookies in the `Cookie` request header; `SameSite` controls cross-site sending, not same-site sending. 
 
 ## Test
 
-1. Open `/builder`, pick the `test-site/` folder (or files).
-2. Bake → Open Website → click CLICK ME (JS works), check styling.
-3. Try: no cookies, corrupted cookie, unsupported file (add a .png), huge site, no index.html, external `https://example.com/test.js` stays external.
+1. Open `/builder`.
+2. Use **Pick files** or **Pick folder**.
+3. Bake → Open Website.
+4. Test styling and JavaScript.
+5. Try corrupted/missing cookies, unsupported files, nested folders, and oversized sites.
